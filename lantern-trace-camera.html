@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lantern Trace — Move to Draw!</title>
+<style>
+  :root{
+    --night-top:#1B2A4A; --night-bottom:#2E1A47;
+    --paper:#FFF8E8; --ink:#2A1B3D;
+    --gold:#FFD93D;
+    --red:#E84A4A; --orange:#FF9F40; --yellow:#FFD93D;
+    --green:#52B788; --blue:#4D96FF; --purple:#9B5DE5;
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Rounded", "Trebuchet MS", Verdana, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background: radial-gradient(ellipse at 50% 0%, var(--night-bottom) 0%, var(--night-top) 60%, #11182E 100%);
+    color: var(--paper);
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  button:focus-visible{outline:3px solid var(--gold); outline-offset:2px;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+
+  #app{min-height:100vh; display:flex; flex-direction:column; align-items:center;}
+  .screen{display:none; flex-direction:column; align-items:center; width:100%; padding:18px 20px 32px;}
+  .screen.active{display:flex;}
+
+  .title-big{font-size:clamp(24px,4vw,38px); font-weight:800; text-shadow:0 0 16px rgba(255,217,61,.55); margin:6px 0 2px; text-align:center;}
+  .subtitle{color:#D9CCEF; margin:0 0 14px; font-size:14px; text-align:center; max-width:560px;}
+
+  .card{
+    background: rgba(255,248,232,.07); border:1px solid rgba(255,217,61,.35);
+    border-radius:22px; padding:20px 24px; max-width:600px; width:100%;
+  }
+  .privacy-note{
+    background:rgba(0,0,0,.22); border-radius:14px; padding:12px 16px;
+    font-size:13.5px; line-height:1.5; color:#E9E1F7; margin-bottom:16px;
+  }
+  .privacy-note b{color:var(--gold);}
+  .section-label{font-size:12.5px; text-transform:uppercase; letter-spacing:1px; color:#C8B8E8; margin:14px 0 8px;}
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{
+    padding:8px 16px; border-radius:999px; background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.2); font-size:14px; font-weight:600; color:#E9E1F7;
+  }
+  .chip.selected{background:var(--gold); color:#3A2A00; border-color:var(--gold);}
+
+  .big-btn{
+    margin-top:18px; padding:14px 30px; border-radius:999px; width:100%;
+    background: linear-gradient(135deg, var(--gold), var(--orange)); color:#3A1F00;
+    font-weight:800; font-size:17px; box-shadow:0 7px 0 rgba(0,0,0,.25);
+  }
+  .big-btn:active{transform:translateY(3px);}
+  .ghost-btn{
+    margin-top:10px; padding:10px 20px; border-radius:999px; width:100%;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); font-weight:600; font-size:14px;
+  }
+
+  .preview-wrap{
+    width:100%; max-width:480px; margin:14px auto 4px; border-radius:16px; overflow:hidden;
+    border:2px solid rgba(255,217,61,.4); background:#000;
+  }
+  #calibCanvas{display:block; width:100%; height:auto;}
+  .meter-wrap{margin:12px 0 4px;}
+  .meter-track{height:14px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden;}
+  .meter-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--green),var(--gold)); transition:width .08s linear;}
+  .meter-label{font-size:12.5px; color:#C8B8E8; margin-top:4px;}
+  .error-box{background:rgba(232,74,74,.18); border:1px solid var(--red); border-radius:12px; padding:10px 14px; font-size:13.5px; margin-top:10px;}
+
+  /* ---- Game screen ---- */
+  #screen-game{padding-top:10px;}
+  .game-header{width:100%; max-width:760px; display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .game-title{font-size:15px; font-weight:700; color:#E9E1F7; opacity:.85;}
+  .header-btns{display:flex; gap:8px;}
+  .icon-btn{background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:6px 10px; font-size:13px;}
+
+  .mascot-row{display:flex; align-items:flex-end; gap:12px; width:100%; max-width:760px; margin-bottom:8px;}
+  .mascot{flex-shrink:0; width:50px; height:50px;}
+  .speech-bubble{
+    flex:1; background:var(--paper); color:var(--ink); border-radius:16px; padding:10px 16px;
+    font-size:clamp(14px,2vw,18px); font-weight:800; position:relative; display:flex; align-items:center; gap:10px; min-height:28px;
+  }
+  .speech-bubble::after{content:""; position:absolute; left:-9px; bottom:12px; border-width:7px 10px 7px 0; border-style:solid; border-color:transparent var(--paper) transparent transparent;}
+  .replay-btn{margin-left:auto; background:rgba(0,0,0,.08); border-radius:50%; width:30px; height:30px; font-size:14px; flex-shrink:0;}
+
+  .stage-wrap{
+    width:100%; max-width:760px; border-radius:18px; overflow:hidden; position:relative;
+    border:2px solid rgba(255,217,61,.35); background:#000;
+  }
+  #stageCanvas{display:block; width:100%; height:auto;}
+
+  .progress-wrap{width:100%; max-width:760px; margin:10px 0 4px;}
+  .progress-track{height:18px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden; position:relative;}
+  .progress-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--gold),var(--orange)); transition:width .15s ease;}
+  .progress-text{font-size:13px; color:#E9E1F7; margin-top:4px; text-align:center; font-weight:700;}
+
+  .controls-row{width:100%; max-width:760px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:12px;}
+  .shape-btn{
+    width:46px; height:46px; border-radius:14px; background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.2); font-size:22px; display:flex; align-items:center; justify-content:center;
+  }
+  .shape-btn.active{background:var(--gold); box-shadow:0 0 14px rgba(255,217,61,.7);}
+  .util-row{width:100%; max-width:760px; display:flex; gap:10px; justify-content:center; margin-top:10px; flex-wrap:wrap;}
+  .util-btn{padding:9px 18px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); font-size:13.5px; font-weight:600;}
+  .util-btn.surprise{background:linear-gradient(135deg,var(--purple),var(--blue)); border-color:transparent; color:#fff;}
+
+  @media (prefers-reduced-motion: reduce){ * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP / CALIBRATION SCREEN ============ -->
+  <section id="screen-setup" class="screen active">
+    <h1 class="title-big">🏮 Lantern Trace</h1>
+    <p class="subtitle">Move together to glow-trace a shape in the sky — no hands, just bodies!</p>
+
+    <div class="card">
+      <div class="privacy-note">
+        <b>About the camera:</b> This only watches for movement (light/dark changes between frames).
+        Nothing is recorded, saved, or sent anywhere — it all stays in this browser tab and disappears the moment you close it.
+      </div>
+
+      <div class="section-label">Camera sensitivity</div>
+      <div class="chip-row" id="sensChips">
+        <button class="chip" data-val="low">Low (bright room)</button>
+        <button class="chip selected" data-val="medium">Medium</button>
+        <button class="chip" data-val="high">High (dim room)</button>
+      </div>
+
+      <button class="big-btn" id="camBtn">Turn On Camera 🎥</button>
+      <div id="errorBox"></div>
+
+      <div id="previewArea" style="display:none">
+        <div class="preview-wrap"><canvas id="calibCanvas"></canvas></div>
+        <div class="meter-wrap">
+          <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+          <div class="meter-label">Wave a hand — the bar should jump when you move. Try to fit the whole group in frame.</div>
+        </div>
+        <button class="big-btn" id="continueBtn">Looks Good — Start Tracing! 🏮</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section id="screen-game" class="screen">
+    <div class="game-header">
+      <div class="game-title">🏮 Lantern Trace</div>
+      <div class="header-btns">
+        <button class="icon-btn" id="muteBtn">🔊</button>
+        <button class="icon-btn" id="backBtn">⬅ Setup</button>
+      </div>
+    </div>
+
+    <div class="mascot-row">
+      <svg class="mascot" viewBox="0 0 100 100">
+        <ellipse cx="50" cy="58" rx="26" ry="22" fill="#FFD93D"/>
+        <circle cx="50" cy="30" r="16" fill="#FFE9A8"/>
+        <circle cx="44" cy="29" r="3" fill="#2A1B3D"/>
+        <circle cx="56" cy="29" r="3" fill="#2A1B3D"/>
+        <path d="M44 36 Q50 41 56 36" stroke="#2A1B3D" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="50" cy="58" r="6" fill="#FFF3CC"/>
+      </svg>
+      <div class="speech-bubble">
+        <span id="promptText">Let's trace a shape together!</span>
+        <button class="replay-btn" id="replayBtn" aria-label="Replay prompt">🔁</button>
+      </div>
+    </div>
+
+    <div class="stage-wrap"><canvas id="stageCanvas"></canvas></div>
+
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">0% traced</div>
+    </div>
+
+    <div class="controls-row" id="shapeButtons"></div>
+    <div class="util-row">
+      <button class="util-btn surprise" id="surpriseBtn">🎲 Surprise Me</button>
+      <button class="util-btn" id="resetRoundBtn">🔄 Reset This Shape</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Shape definitions (normalized -1..1, y-down) ---------------- */
+  function makeEllipseVerts(rx, ry, n){
+    const v = [];
+    for(let i=0;i<n;i++){ const t=(i/n)*Math.PI*2; v.push([rx*Math.cos(t), ry*Math.sin(t)]); }
+    return v;
+  }
+  const SHAPE_DEFS = {
+    circle:    makeEllipseVerts(0.85,0.85,28),
+    oval:      makeEllipseVerts(0.9,0.6,28),
+    square:    [[-0.75,-0.75],[0.75,-0.75],[0.75,0.75],[-0.75,0.75]],
+    rectangle: [[-0.9,-0.5],[0.9,-0.5],[0.9,0.5],[-0.9,0.5]],
+    triangle:  [[0,-0.85],[0.85,0.7],[-0.85,0.7]],
+    diamond:   [[0,-0.9],[0.9,0],[0,0.9],[-0.9,0]],
+    star: [[0,-0.95],[0.235,-0.324],[0.904,-0.294],[0.380,0.124],[0.559,0.769],
+           [0,0.4],[-0.559,0.769],[-0.380,0.124],[-0.904,-0.294],[-0.235,-0.324]],
+    heart: [[0,1],[-0.45,0.55],[-0.85,0.25],[-1,-0.05],[-0.85,-0.35],[-0.55,-0.5],
+            [-0.25,-0.45],[0,-0.25],[0.25,-0.45],[0.55,-0.5],[0.85,-0.35],[1,-0.05],
+            [0.85,0.25],[0.45,0.55]]
+  };
+  const SHAPE_KEYS = Object.keys(SHAPE_DEFS);
+  const SHAPE_EMOJI = { circle:'⚪', square:'🟧', rectangle:'▭', triangle:'🔺', star:'⭐', heart:'❤️', oval:'🥚', diamond:'🔷' };
+
+  const COLORS = {
+    red:'#E84A4A', orange:'#FF9F40', yellow:'#FFD93D', green:'#52B788', blue:'#4D96FF', purple:'#9B5DE5'
+  };
+  const COLOR_KEYS = Object.keys(COLORS);
+
+  function samplePolygonPerimeter(verts, n){
+    const edges = []; let total = 0;
+    for(let i=0;i<verts.length;i++){
+      const a = verts[i], b = verts[(i+1)%verts.length];
+      const len = Math.hypot(b[0]-a[0], b[1]-a[1]);
+      edges.push({a,b,len,start:total}); total += len;
+    }
+    const pts = [];
+    for(let i=0;i<n;i++){
+      const d = (total*i)/n;
+      let e = edges[edges.length-1];
+      for(const edge of edges){ if(d >= edge.start && d <= edge.start+edge.len){ e = edge; break; } }
+      const t = e.len === 0 ? 0 : (d - e.start)/e.len;
+      pts.push({ nx: e.a[0]+(e.b[0]-e.a[0])*t, ny: e.a[1]+(e.b[1]-e.a[1])*t });
+    }
+    return pts;
+  }
+
+  const NUM_GUIDE_POINTS = 56;
+  const COMPLETE_THRESHOLD = 0.8;
+  const SENS_THRESHOLDS = { low:36, medium:24, high:14 };
+
+  /* ---------------- State ---------------- */
+  let state = {
+    sensitivity:'medium',
+    soundOn:true,
+    stream:null, videoReady:false,
+    canvasW:0, canvasH:0,
+    analysisW:0, analysisH:0,
+    prevGray:null,
+    guidePoints:[], filled:[], filledCount:0, completed:false,
+    milestones:{m25:false,m50:false,m75:false},
+    currentShape:'circle', currentColor:'gold',
+    gameActive:false,
+    particles:[]
+  };
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ audioCtx=null; } }
+    return audioCtx;
+  }
+  function tone(freq,dur,type,vol,delay){
+    if(!state.soundOn) return;
+    const ctx = ensureAudio(); if(!ctx) return;
+    const t0 = ctx.currentTime + (delay||0);
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.setValueAtTime(freq,t0);
+    gain.gain.setValueAtTime(0,t0);
+    gain.gain.linearRampToValueAtTime(vol||0.15,t0+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  function sparkleSound(){ tone(880,0.12,'triangle',0.14,0); }
+  function fanfare(){ [523,659,784,1046].forEach((f,i)=>tone(f,0.3,'triangle',0.2,i*0.15)); }
+  function speak(text){
+    if(!state.soundOn || !('speechSynthesis' in window)) return;
+    try{ window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate=0.85; u.pitch=1.15; u.lang='en-US';
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  /* ---------------- DOM refs ---------------- */
+  const video = document.createElement('video');
+  video.muted = true; video.playsInline = true; video.autoplay = true;
+  video.style.position='absolute'; video.style.width='1px'; video.style.height='1px'; video.style.opacity='0';
+  document.body.appendChild(video);
+
+  const calibCanvas = document.getElementById('calibCanvas');
+  const stageCanvas = document.getElementById('stageCanvas');
+  const cctx = calibCanvas.getContext('2d');
+  const sctx = stageCanvas.getContext('2d');
+
+  let analysisCanvas = document.createElement('canvas');
+  let actx = analysisCanvas.getContext('2d', { willReadFrequently:true });
+
+  /* ---------------- Camera setup ---------------- */
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  async function turnOnCamera(){
+    const errorBox = document.getElementById('errorBox');
+    errorBox.innerHTML = '';
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      errorBox.innerHTML = '<div class="error-box">This browser does not support camera access. Try the latest Chrome, Edge, or Safari, served over https:// (GitHub Pages works fine).</div>';
+      return;
+    }
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:960}, height:{ideal:540} }, audio:false });
+      state.stream = stream;
+      video.srcObject = stream;
+      await video.play();
+      video.addEventListener('loadedmetadata', onVideoReady, { once:true });
+      if(video.videoWidth) onVideoReady();
+    }catch(err){
+      errorBox.innerHTML = '<div class="error-box">Camera access was blocked or unavailable. Check your browser\'s camera permission for this page and try again. (Note: this needs to be opened over https:// — e.g. your GitHub Pages link — not a local file.)</div>';
+    }
+  }
+
+  function onVideoReady(){
+    if(state.videoReady) return;
+    state.canvasW = video.videoWidth || 960;
+    state.canvasH = video.videoHeight || 540;
+    calibCanvas.width = state.canvasW; calibCanvas.height = state.canvasH;
+    stageCanvas.width = state.canvasW; stageCanvas.height = state.canvasH;
+    calibCanvas.style.aspectRatio = state.canvasW + ' / ' + state.canvasH;
+    stageCanvas.style.aspectRatio = state.canvasW + ' / ' + state.canvasH;
+
+    state.analysisW = Math.max(48, Math.round(state.canvasW/8));
+    state.analysisH = Math.max(36, Math.round(state.canvasH/8));
+    analysisCanvas.width = state.analysisW; analysisCanvas.height = state.analysisH;
+
+    state.videoReady = true;
+    document.getElementById('previewArea').style.display = 'block';
+    renderLoop();
+    setInterval(analysisTick, 120);
+  }
+
+  /* ---------------- Render loop (video mirror) ---------------- */
+  function drawMirroredVideo(ctx, w, h){
+    ctx.save();
+    ctx.translate(w,0); ctx.scale(-1,1);
+    ctx.drawImage(video,0,0,w,h);
+    ctx.restore();
+  }
+
+  function renderLoop(){
+    if(state.videoReady){
+      if(document.getElementById('screen-setup').classList.contains('active')){
+        drawMirroredVideo(cctx, state.canvasW, state.canvasH);
+      }
+      if(document.getElementById('screen-game').classList.contains('active')){
+        drawMirroredVideo(sctx, state.canvasW, state.canvasH);
+        drawGuideOutline();
+        drawPaintDots();
+        drawParticles();
+      }
+    }
+    requestAnimationFrame(renderLoop);
+  }
+
+  /* ---------------- Motion analysis ---------------- */
+  function analysisTick(){
+    if(!state.videoReady) return;
+    drawMirroredVideo(actx, state.analysisW, state.analysisH);
+    let frame;
+    try{ frame = actx.getImageData(0,0,state.analysisW,state.analysisH).data; }
+    catch(e){ return; }
+    const n = state.analysisW*state.analysisH;
+    const gray = new Float32Array(n);
+    for(let i=0;i<n;i++){
+      gray[i] = (frame[i*4]+frame[i*4+1]+frame[i*4+2])/3;
+    }
+    if(state.prevGray){
+      const threshold = SENS_THRESHOLDS[state.sensitivity] || 24;
+      const motionMask = new Uint8Array(n);
+      let motionCount = 0;
+      for(let i=0;i<n;i++){
+        if(Math.abs(gray[i]-state.prevGray[i]) > threshold){ motionMask[i]=1; motionCount++; }
+      }
+      const minFloor = Math.max(6, Math.floor(n*0.01));
+      const meterFill = document.getElementById('meterFill');
+      if(meterFill){
+        const pct = Math.min(100, (motionCount/n)*400);
+        meterFill.style.width = pct.toFixed(0)+'%';
+      }
+      if(motionCount >= minFloor && state.gameActive && !state.completed){
+        checkGuideFill(motionMask);
+      }
+    }
+    state.prevGray = gray;
+  }
+
+  function checkGuideFill(motionMask){
+    const sx = state.analysisW/state.canvasW, sy = state.analysisH/state.canvasH;
+    const R = 2;
+    let newlyFilled = false;
+    for(let i=0;i<state.guidePoints.length;i++){
+      if(state.filled[i]) continue;
+      const gp = state.guidePoints[i];
+      const ax = Math.round(gp.x*sx), ay = Math.round(gp.y*sy);
+      let hit = false;
+      for(let dy=-R; dy<=R && !hit; dy++){
+        for(let dx=-R; dx<=R; dx++){
+          const xx=ax+dx, yy=ay+dy;
+          if(xx<0||yy<0||xx>=state.analysisW||yy>=state.analysisH) continue;
+          if(motionMask[yy*state.analysisW+xx]){ hit=true; break; }
+        }
+      }
+      if(hit){ state.filled[i]=true; state.filledCount++; newlyFilled = true; }
+    }
+    if(newlyFilled) updateProgress();
+  }
+
+  /* ---------------- Stage drawing ---------------- */
+  function drawGuideOutline(){
+    if(!state.guidePoints.length) return;
+    sctx.save();
+    sctx.beginPath();
+    state.guidePoints.forEach((p,i)=>{
+      const x = state.canvasW/2 + p.nx, y = state.canvasH/2 + p.ny;
+      if(i===0) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+    });
+    sctx.closePath();
+    sctx.setLineDash([10,8]);
+    sctx.lineWidth = 4;
+    sctx.strokeStyle = 'rgba(255,217,61,0.45)';
+    sctx.stroke();
+    sctx.restore();
+  }
+
+  function drawPaintDots(){
+    const color = COLORS[state.currentColor] || '#FFD93D';
+    sctx.save();
+    for(let i=0;i<state.guidePoints.length;i++){
+      if(!state.filled[i]) continue;
+      const p = state.guidePoints[i];
+      const x = state.canvasW/2 + p.nx, y = state.canvasH/2 + p.ny;
+      const grad = sctx.createRadialGradient(x,y,0,x,y,16);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(x,y,16,0,Math.PI*2);
+      sctx.fill();
+      sctx.fillStyle = color;
+      sctx.beginPath();
+      sctx.arc(x,y,5,0,Math.PI*2);
+      sctx.fill();
+    }
+    sctx.restore();
+  }
+
+  function spawnParticles(cx, cy, count, colorList){
+    const now = performance.now();
+    for(let i=0;i<count;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = 60+Math.random()*160;
+      state.particles.push({
+        x:cx, y:cy,
+        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+        born:now, life:900+Math.random()*500,
+        color: colorList[Math.floor(Math.random()*colorList.length)],
+        size: 3+Math.random()*4
+      });
+    }
+  }
+  function drawParticles(){
+    const now = performance.now();
+    state.particles = state.particles.filter(p => (now-p.born) < p.life);
+    sctx.save();
+    state.particles.forEach(p=>{
+      const age = (now-p.born)/1000;
+      const x = p.x + p.vx*age, y = p.y + p.vy*age + 60*age*age;
+      const alpha = Math.max(0, 1-(now-p.born)/p.life);
+      sctx.globalAlpha = alpha;
+      sctx.fillStyle = p.color;
+      sctx.beginPath(); sctx.arc(x,y,p.size,0,Math.PI*2); sctx.fill();
+    });
+    sctx.restore();
+  }
+
+  /* ---------------- Round / progress logic ---------------- */
+  function updateProgress(){
+    const pct = state.filledCount/state.guidePoints.length;
+    document.getElementById('progressFill').style.width = (pct*100).toFixed(0)+'%';
+    document.getElementById('progressText').textContent = Math.round(pct*100)+'% traced';
+
+    if(pct>=0.25 && !state.milestones.m25){ state.milestones.m25=true; sparkleSound(); }
+    if(pct>=0.5 && !state.milestones.m50){ state.milestones.m50=true; sparkleSound(); }
+    if(pct>=0.75 && !state.milestones.m75){ state.milestones.m75=true; sparkleSound(); }
+    if(pct>=COMPLETE_THRESHOLD && !state.completed){
+      state.completed = true;
+      triggerCompletion();
+    }
+  }
+
+  function triggerCompletion(){
+    fanfare();
+    speak('Wonderful! You drew it together!');
+    document.getElementById('promptText').textContent = `You did it! That's a ${state.currentColor} ${state.currentShape}! 🎉 Pick the next shape!`;
+    spawnParticles(state.canvasW/2, state.canvasH/2, 40, Object.values(COLORS));
+  }
+
+  function pickShape(shape, color){
+    state.currentShape = shape;
+    state.currentColor = color || COLOR_KEYS[Math.floor(Math.random()*COLOR_KEYS.length)];
+    const norm = SHAPE_DEFS[shape];
+    const stageSize = Math.min(state.canvasW, state.canvasH) * 0.8;
+    const sampled = samplePolygonPerimeter(norm, NUM_GUIDE_POINTS);
+    state.guidePoints = sampled.map(p => ({ nx: p.nx*stageSize/2, ny: p.ny*stageSize/2 }));
+    state.filled = new Array(NUM_GUIDE_POINTS).fill(false);
+    state.filledCount = 0;
+    state.completed = false;
+    state.milestones = {m25:false,m50:false,m75:false};
+    state.particles = [];
+
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = '0% traced';
+
+    const promptText = `Let's trace a ${state.currentColor.toUpperCase()} ${shape.toUpperCase()} together!`;
+    document.getElementById('promptText').textContent = promptText;
+    speak(promptText);
+
+    document.querySelectorAll('.shape-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.shape === shape);
+    });
+  }
+
+  function resetCurrentRound(){
+    pickShape(state.currentShape, state.currentColor);
+  }
+
+  function surpriseShape(){
+    let next = state.currentShape;
+    while(next === state.currentShape){ next = SHAPE_KEYS[Math.floor(Math.random()*SHAPE_KEYS.length)]; }
+    pickShape(next);
+  }
+
+  /* ---------------- UI wiring ---------------- */
+  function buildShapeButtons(){
+    const el = document.getElementById('shapeButtons');
+    el.innerHTML = SHAPE_KEYS.map(s=>`<button class="shape-btn" data-shape="${s}" aria-label="${s}">${SHAPE_EMOJI[s]}</button>`).join('');
+    el.querySelectorAll('.shape-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> pickShape(btn.dataset.shape));
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    buildShapeButtons();
+
+    document.getElementById('sensChips').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.chip'); if(!btn) return;
+      document.querySelectorAll('#sensChips .chip').forEach(c=>c.classList.remove('selected'));
+      btn.classList.add('selected');
+      state.sensitivity = btn.dataset.val;
+    });
+
+    document.getElementById('camBtn').addEventListener('click', ()=>{ ensureAudio(); turnOnCamera(); });
+
+    document.getElementById('continueBtn').addEventListener('click', ()=>{
+      state.gameActive = true;
+      showScreen('screen-game');
+      pickShape(SHAPE_KEYS[Math.floor(Math.random()*SHAPE_KEYS.length)]);
+    });
+
+    document.getElementById('replayBtn').addEventListener('click', ()=>{
+      speak(`Trace the ${state.currentColor} ${state.currentShape}!`);
+    });
+
+    document.getElementById('surpriseBtn').addEventListener('click', surpriseShape);
+    document.getElementById('resetRoundBtn').addEventListener('click', resetCurrentRound);
+
+    document.getElementById('muteBtn').addEventListener('click', (e)=>{
+      state.soundOn = !state.soundOn;
+      e.target.textContent = state.soundOn ? '🔊' : '🔇';
+      if(!state.soundOn && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+
+    document.getElementById('backBtn').addEventListener('click', ()=>{
+      state.gameActive = false;
+      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; }
+      state.videoReady = false;
+      document.getElementById('previewArea').style.display = 'none';
+      showScreen('screen-setup');
+    });
+  });
+})();
+</script>
+</body>
+</html>
