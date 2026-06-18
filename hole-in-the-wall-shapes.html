@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hole in the Wall: Shape Squad</title>
+<style>
+  :root{
+    --night-top:#1B2A4A; --night-bottom:#2E1A47;
+    --paper:#FFF8E8; --ink:#2A1B3D; --gold:#FFD93D; --orange:#FF9F40;
+    --green:#52B788; --red:#E84A4A; --blue:#4D96FF; --purple:#9B5DE5;
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Rounded", "Trebuchet MS", Verdana, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{min-height:100vh; background:radial-gradient(ellipse at 50% 0%, var(--night-bottom) 0%, var(--night-top) 60%, #11182E 100%); color:var(--paper);}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  button:focus-visible{outline:3px solid var(--gold); outline-offset:2px;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+
+  #app{min-height:100vh; display:flex; flex-direction:column; align-items:center;}
+  .screen{display:none; flex-direction:column; align-items:center; width:100%; padding:18px 20px 32px;}
+  .screen.active{display:flex;}
+
+  .title-big{font-size:clamp(22px,4vw,34px); font-weight:800; text-shadow:0 0 16px rgba(255,217,61,.55); margin:6px 0 2px; text-align:center;}
+  .subtitle{color:#D9CCEF; margin:0 0 14px; font-size:14px; text-align:center; max-width:560px;}
+
+  .card{background:rgba(255,248,232,.07); border:1px solid rgba(255,217,61,.35); border-radius:22px; padding:20px 24px; max-width:600px; width:100%;}
+  .privacy-note{background:rgba(0,0,0,.22); border-radius:14px; padding:12px 16px; font-size:13.5px; line-height:1.5; color:#E9E1F7; margin-bottom:16px;}
+  .privacy-note b{color:var(--gold);}
+  .howto{background:rgba(0,0,0,.22); border-radius:14px; padding:12px 16px; font-size:13.5px; line-height:1.55; color:#E9E1F7; margin-bottom:16px;}
+  .howto b{color:var(--gold);}
+  .section-label{font-size:12.5px; text-transform:uppercase; letter-spacing:1px; color:#C8B8E8; margin:14px 0 8px;}
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{padding:8px 16px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); font-size:14px; font-weight:600; color:#E9E1F7;}
+  .chip.selected{background:var(--gold); color:#3A2A00; border-color:var(--gold);}
+
+  .big-btn{margin-top:18px; padding:14px 30px; border-radius:999px; width:100%; background:linear-gradient(135deg,var(--gold),var(--orange)); color:#3A1F00; font-weight:800; font-size:17px; box-shadow:0 7px 0 rgba(0,0,0,.25);}
+  .big-btn:active{transform:translateY(3px);}
+  .ghost-btn{margin-top:10px; padding:10px 20px; border-radius:999px; width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); font-weight:600; font-size:14px;}
+
+  .preview-wrap{width:100%; max-width:480px; margin:14px auto 4px; border-radius:16px; overflow:hidden; border:2px solid rgba(255,217,61,.4); background:#000; position:relative;}
+  #calibCanvas{display:block; width:100%; height:auto;}
+  .countdown-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:64px; font-weight:800; background:rgba(0,0,0,.35); color:var(--gold); text-shadow:0 0 14px rgba(0,0,0,.8);}
+  .error-box{background:rgba(232,74,74,.18); border:1px solid var(--red); border-radius:12px; padding:10px 14px; font-size:13.5px; margin-top:10px;}
+  .status-line{font-size:13px; color:#C8B8E8; margin-top:8px; text-align:center;}
+
+  /* ---- Game screen ---- */
+  .game-header{width:100%; max-width:760px; display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; gap:8px; flex-wrap:wrap;}
+  .round-pill{background:rgba(255,217,61,.18); border:1px solid rgba(255,217,61,.4); border-radius:999px; padding:5px 14px; font-size:13px; font-weight:700; color:var(--gold);}
+  .header-btns{display:flex; gap:8px;}
+  .icon-btn{background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:6px 10px; font-size:13px;}
+
+  .mascot-row{display:flex; align-items:flex-end; gap:12px; width:100%; max-width:760px; margin-bottom:8px;}
+  .mascot{flex-shrink:0; width:50px; height:50px;}
+  .speech-bubble{flex:1; background:var(--paper); color:var(--ink); border-radius:16px; padding:10px 16px; font-size:clamp(14px,2vw,18px); font-weight:800; position:relative; display:flex; align-items:center; gap:10px; min-height:28px;}
+  .speech-bubble::after{content:""; position:absolute; left:-9px; bottom:12px; border-width:7px 10px 7px 0; border-style:solid; border-color:transparent var(--paper) transparent transparent;}
+
+  .stage-wrap{width:100%; max-width:760px; border-radius:18px; overflow:hidden; position:relative; border:2px solid rgba(255,217,61,.35); background:#000;}
+  #stageCanvas{display:block; width:100%; height:auto;}
+
+  .meter-row{width:100%; max-width:760px; display:flex; align-items:center; gap:14px; margin:10px 0 4px;}
+  .timer-ring{width:52px; height:52px; border-radius:50%; background:conic-gradient(var(--gold) calc(var(--pct,100)*1%), rgba(255,255,255,.12) 0); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .timer-ring::after{content:attr(data-sec); width:40px; height:40px; border-radius:50%; background:var(--night-top); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px;}
+  .fill-track{flex:1; height:18px; border-radius:999px; background:rgba(255,255,255,.12); overflow:hidden; position:relative;}
+  .fill-bar{height:100%; width:0%; background:linear-gradient(90deg,var(--green),var(--gold)); transition:width .12s linear;}
+  .fill-pct{font-size:13px; font-weight:700; min-width:42px; text-align:right;}
+
+  .result-banner{width:100%; max-width:760px; text-align:center; font-size:16px; font-weight:800; margin:8px 0 2px; min-height:24px; color:var(--gold);}
+  .next-btn{margin-top:8px; padding:12px 28px; border-radius:999px; font-weight:800; font-size:16px; background:linear-gradient(135deg,var(--green),var(--blue)); color:#08291c; box-shadow:0 6px 0 rgba(0,0,0,.25); visibility:hidden;}
+  .next-btn.show{visibility:visible;}
+
+  .controls-row{width:100%; max-width:760px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:14px;}
+  .shape-btn{width:46px; height:46px; border-radius:14px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); font-size:22px; display:flex; align-items:center; justify-content:center;}
+  .shape-btn.active{background:var(--gold); box-shadow:0 0 14px rgba(255,217,61,.7);}
+  .util-row{width:100%; max-width:760px; display:flex; gap:10px; justify-content:center; margin-top:10px; flex-wrap:wrap;}
+  .util-btn{padding:9px 18px; border-radius:999px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); font-size:13.5px; font-weight:600;}
+  .util-btn.surprise{background:linear-gradient(135deg,var(--purple),var(--blue)); border-color:transparent; color:#fff;}
+
+  @media (prefers-reduced-motion: reduce){ * { transition:none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP / CALIBRATION SCREEN ============ -->
+  <section id="screen-setup" class="screen active">
+    <h1 class="title-big">🕳️ Hole in the Wall: Shape Squad</h1>
+    <p class="subtitle">Work together to fill the shape with your bodies — before time runs out!</p>
+
+    <div class="card">
+      <div class="privacy-note">
+        <b>About the camera:</b> It only looks for where bodies are versus an empty-room reference. Nothing is recorded, saved, or sent anywhere — it all stays in this browser tab.
+      </div>
+      <div class="howto">
+        <b>How each shape works:</b> Round 1 — shape name is spoken and a guide stays on screen the whole time.
+        Round 2 — name is spoken, then the guide flashes for 3 seconds before disappearing. Round 3 — only the name is spoken, no guide at all. Each round has its own countdown.
+      </div>
+
+      <div class="section-label">Detection sensitivity</div>
+      <div class="chip-row" id="sensChips">
+        <button class="chip" data-val="low">Low (bright room)</button>
+        <button class="chip selected" data-val="medium">Medium</button>
+        <button class="chip" data-val="high">High (dim room)</button>
+      </div>
+
+      <div class="section-label">Seconds per round</div>
+      <div class="chip-row" id="timerChips">
+        <button class="chip" data-val="8">8s</button>
+        <button class="chip selected" data-val="12">12s</button>
+        <button class="chip" data-val="15">15s</button>
+      </div>
+
+      <button class="big-btn" id="camBtn">Turn On Camera 🎥</button>
+      <div id="errorBox"></div>
+
+      <div id="previewArea" style="display:none">
+        <div class="status-line" id="calibStatus">Step everyone out of frame, then capture the empty room.</div>
+        <div class="preview-wrap">
+          <canvas id="calibCanvas"></canvas>
+          <div class="countdown-overlay" id="countdownOverlay" style="display:none"></div>
+        </div>
+        <button class="big-btn" id="captureBtn">Capture Empty Room 📸</button>
+        <button class="ghost-btn" id="continueBtn" style="display:none">Looks Good — Pick a Shape! 🏮</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section id="screen-game" class="screen">
+    <div class="game-header">
+      <div class="round-pill" id="roundPill">Round 1 of 3</div>
+      <div class="header-btns">
+        <button class="icon-btn" id="recalBtn">🔄 Recalibrate</button>
+        <button class="icon-btn" id="muteBtn">🔊</button>
+        <button class="icon-btn" id="backBtn">⬅ Setup</button>
+      </div>
+    </div>
+
+    <div class="mascot-row">
+      <svg class="mascot" viewBox="0 0 100 100">
+        <ellipse cx="50" cy="58" rx="26" ry="22" fill="#FFD93D"/>
+        <circle cx="50" cy="30" r="16" fill="#FFE9A8"/>
+        <circle cx="44" cy="29" r="3" fill="#2A1B3D"/>
+        <circle cx="56" cy="29" r="3" fill="#2A1B3D"/>
+        <path d="M44 36 Q50 41 56 36" stroke="#2A1B3D" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="50" cy="58" r="6" fill="#FFF3CC"/>
+      </svg>
+      <div class="speech-bubble" id="promptText">Pick a shape to begin!</div>
+    </div>
+
+    <div class="stage-wrap"><canvas id="stageCanvas"></canvas></div>
+
+    <div class="meter-row" id="meterRow" style="visibility:hidden">
+      <div class="timer-ring" id="timerRing" data-sec="0" style="--pct:100"></div>
+      <div class="fill-track"><div class="fill-bar" id="fillBar"></div></div>
+      <div class="fill-pct" id="fillPctText">0%</div>
+    </div>
+
+    <div class="result-banner" id="resultBanner"></div>
+    <button class="next-btn" id="nextBtn">Next Round ▶</button>
+
+    <div class="controls-row" id="shapeButtons"></div>
+    <div class="util-row">
+      <button class="util-btn surprise" id="surpriseBtn">🎲 Surprise Me</button>
+      <button class="util-btn" id="resetRoundBtn">🔄 Redo This Round</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Shape definitions (normalized -1..1, y-down) ---------------- */
+  function makeEllipseVerts(rx, ry, n){
+    const v = [];
+    for(let i=0;i<n;i++){ const t=(i/n)*Math.PI*2; v.push([rx*Math.cos(t), ry*Math.sin(t)]); }
+    return v;
+  }
+  const SHAPE_DEFS = {
+    circle:    makeEllipseVerts(0.85,0.85,28),
+    oval:      makeEllipseVerts(0.9,0.6,28),
+    square:    [[-0.75,-0.75],[0.75,-0.75],[0.75,0.75],[-0.75,0.75]],
+    rectangle: [[-0.9,-0.5],[0.9,-0.5],[0.9,0.5],[-0.9,0.5]],
+    triangle:  [[0,-0.85],[0.85,0.7],[-0.85,0.7]],
+    diamond:   [[0,-0.9],[0.9,0],[0,0.9],[-0.9,0]],
+    star: [[0,-0.95],[0.235,-0.324],[0.904,-0.294],[0.380,0.124],[0.559,0.769],
+           [0,0.4],[-0.559,0.769],[-0.380,0.124],[-0.904,-0.294],[-0.235,-0.324]],
+    heart: [[0,1],[-0.45,0.55],[-0.85,0.25],[-1,-0.05],[-0.85,-0.35],[-0.55,-0.5],
+            [-0.25,-0.45],[0,-0.25],[0.25,-0.45],[0.55,-0.5],[0.85,-0.35],[1,-0.05],
+            [0.85,0.25],[0.45,0.55]]
+  };
+  const SHAPE_KEYS = Object.keys(SHAPE_DEFS);
+  const SHAPE_EMOJI = { circle:'⚪', square:'🟧', rectangle:'▭', triangle:'🔺', star:'⭐', heart:'❤️', oval:'🥚', diamond:'🔷' };
+  const GUIDE_COLOR = '#FFD93D';
+
+  const SENS_THRESHOLDS = { low:42, medium:30, high:20 };
+
+  /* ---------------- State ---------------- */
+  let state = {
+    sensitivity:'medium',
+    roundTimerSeconds:12,
+    soundOn:true,
+    stream:null, videoReady:false,
+    canvasW:0, canvasH:0,
+    analysisW:0, analysisH:0,
+    backgroundGray:null,
+    currentShape:'circle',
+    round:1,
+    insideShapeMask:null, insideShapeCount:0,
+    guideCanvas:null,
+    glowCanvas:null,
+    guideVisible:false,
+    challengeActive:false,
+    timeRemaining:0,
+    peakFill:0,
+    timerInterval:null,
+    particles:[]
+  };
+
+  let audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ audioCtx=null; } }
+    return audioCtx;
+  }
+  function tone(freq,dur,type,vol,delay){
+    if(!state.soundOn) return;
+    const ctx = ensureAudio(); if(!ctx) return;
+    const t0 = ctx.currentTime + (delay||0);
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.setValueAtTime(freq,t0);
+    gain.gain.setValueAtTime(0,t0);
+    gain.gain.linearRampToValueAtTime(vol||0.15,t0+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+dur+0.02);
+  }
+  function tickSound(){ tone(880,0.06,'square',0.06,0); }
+  function sparkleSound(){ tone(880,0.12,'triangle',0.14,0); }
+  function fanfare(){ [523,659,784,1046].forEach((f,i)=>tone(f,0.3,'triangle',0.2,i*0.15)); }
+  function lowTone(){ tone(220,0.25,'sawtooth',0.13,0); }
+
+  function speakShapeName(shape, cb){
+    let called = false;
+    function done(){ if(called) return; called = true; cb(); }
+    if(state.soundOn && 'speechSynthesis' in window){
+      try{
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(shape);
+        u.rate = 0.8; u.pitch = 1.1; u.lang = 'en-US';
+        u.onend = done; u.onerror = done;
+        window.speechSynthesis.speak(u);
+        setTimeout(done, 1800);
+      }catch(e){ setTimeout(done, 800); }
+    } else {
+      setTimeout(done, 800);
+    }
+  }
+
+  /* ---------------- DOM refs ---------------- */
+  const video = document.createElement('video');
+  video.muted = true; video.playsInline = true; video.autoplay = true;
+  video.style.position='absolute'; video.style.width='1px'; video.style.height='1px'; video.style.opacity='0';
+  document.body.appendChild(video);
+
+  const calibCanvas = document.getElementById('calibCanvas');
+  const stageCanvas = document.getElementById('stageCanvas');
+  const cctx = calibCanvas.getContext('2d');
+  const sctx = stageCanvas.getContext('2d');
+
+  let analysisCanvas = document.createElement('canvas');
+  let actx = analysisCanvas.getContext('2d', { willReadFrequently:true });
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  /* ---------------- Camera setup ---------------- */
+  async function turnOnCamera(){
+    const errorBox = document.getElementById('errorBox');
+    errorBox.innerHTML = '';
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      errorBox.innerHTML = '<div class="error-box">This browser does not support camera access. Try the latest Chrome, Edge, or Safari, served over https:// (your GitHub Pages link works).</div>';
+      return;
+    }
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:960}, height:{ideal:540} }, audio:false });
+      state.stream = stream;
+      video.srcObject = stream;
+      await video.play();
+      video.addEventListener('loadedmetadata', onVideoReady, { once:true });
+      if(video.videoWidth) onVideoReady();
+    }catch(err){
+      errorBox.innerHTML = '<div class="error-box">Camera access was blocked or unavailable. Check this page\'s camera permission and try again. (Needs https:// — e.g. your GitHub Pages link — not a local file.)</div>';
+    }
+  }
+
+  function onVideoReady(){
+    if(state.videoReady) return;
+    state.canvasW = video.videoWidth || 960;
+    state.canvasH = video.videoHeight || 540;
+    calibCanvas.width = state.canvasW; calibCanvas.height = state.canvasH;
+    stageCanvas.width = state.canvasW; stageCanvas.height = state.canvasH;
+    calibCanvas.style.aspectRatio = state.canvasW + ' / ' + state.canvasH;
+    stageCanvas.style.aspectRatio = state.canvasW + ' / ' + state.canvasH;
+
+    state.analysisW = Math.max(60, Math.round(state.canvasW/8));
+    state.analysisH = Math.max(45, Math.round(state.canvasH/8));
+    analysisCanvas.width = state.analysisW; analysisCanvas.height = state.analysisH;
+
+    state.videoReady = true;
+    document.getElementById('previewArea').style.display = 'block';
+    document.getElementById('continueBtn').style.display = 'none';
+    renderLoop();
+    setInterval(analysisTick, 110);
+  }
+
+  function drawMirroredVideo(ctx, w, h){
+    ctx.save();
+    ctx.translate(w,0); ctx.scale(-1,1);
+    ctx.drawImage(video,0,0,w,h);
+    ctx.restore();
+  }
+
+  /* ---------------- Background capture ---------------- */
+  function captureGray(w, h){
+    drawMirroredVideo(actx, w, h);
+    const data = actx.getImageData(0,0,w,h).data;
+    const n = w*h;
+    const gray = new Float32Array(n);
+    for(let i=0;i<n;i++){ gray[i] = (data[i*4]+data[i*4+1]+data[i*4+2])/3; }
+    return gray;
+  }
+
+  function startCaptureSequence(){
+    const overlay = document.getElementById('countdownOverlay');
+    overlay.style.display = 'flex';
+    let count = 3;
+    overlay.textContent = count;
+    const iv = setInterval(()=>{
+      count--;
+      if(count > 0){ overlay.textContent = count; }
+      else{
+        clearInterval(iv);
+        overlay.textContent = '📸';
+        setTimeout(()=>{
+          state.backgroundGray = captureGray(state.analysisW, state.analysisH);
+          overlay.style.display = 'none';
+          document.getElementById('calibStatus').textContent = 'Background captured! Step in and wave to test, then continue.';
+          document.getElementById('continueBtn').style.display = 'block';
+        }, 250);
+      }
+    }, 700);
+  }
+
+  /* ---------------- Render loop ---------------- */
+  function renderLoop(){
+    if(state.videoReady){
+      if(document.getElementById('screen-setup').classList.contains('active')){
+        drawMirroredVideo(cctx, state.canvasW, state.canvasH);
+        if(state.backgroundGray) drawCalibGlow();
+      }
+      if(document.getElementById('screen-game').classList.contains('active')){
+        drawMirroredVideo(sctx, state.canvasW, state.canvasH);
+        if(state.guideVisible && state.guideCanvas) sctx.drawImage(state.guideCanvas, 0, 0);
+        if(state.glowCanvas) sctx.drawImage(state.glowCanvas, 0, 0);
+        drawParticles();
+      }
+    }
+    requestAnimationFrame(renderLoop);
+  }
+
+  function drawCalibGlow(){
+    // quick visual test on the calibration screen: tint detected foreground
+    if(!state.lastForegroundMask) return;
+    const cw = calibCanvas.width / state.analysisW;
+    const ch = calibCanvas.height / state.analysisH;
+    cctx.save();
+    cctx.fillStyle = 'rgba(255,217,61,0.45)';
+    for(let y=0;y<state.analysisH;y++){
+      for(let x=0;x<state.analysisW;x++){
+        if(state.lastForegroundMask[y*state.analysisW+x]){
+          cctx.fillRect(x*cw, y*ch, cw, ch);
+        }
+      }
+    }
+    cctx.restore();
+  }
+
+  /* ---------------- Motion / silhouette analysis ---------------- */
+  function analysisTick(){
+    if(!state.videoReady || !state.backgroundGray) return;
+    const gray = captureGray(state.analysisW, state.analysisH);
+    const n = state.analysisW*state.analysisH;
+    const threshold = SENS_THRESHOLDS[state.sensitivity] || 30;
+    const fg = new Uint8Array(n);
+    for(let i=0;i<n;i++){
+      if(Math.abs(gray[i]-state.backgroundGray[i]) > threshold) fg[i] = 1;
+    }
+    state.lastForegroundMask = fg;
+
+    if(state.challengeActive && state.insideShapeMask){
+      let hit = 0;
+      for(let i=0;i<n;i++){
+        if(state.insideShapeMask[i] && fg[i]) hit++;
+      }
+      const pct = state.insideShapeCount ? hit/state.insideShapeCount : 0;
+      if(pct > state.peakFill) state.peakFill = pct;
+      updateLiveMeter(pct);
+    }
+
+    redrawGlow(fg);
+  }
+
+  function redrawGlow(fg){
+    if(!state.glowCanvas){
+      state.glowCanvas = document.createElement('canvas');
+      state.glowCanvas.width = state.canvasW; state.glowCanvas.height = state.canvasH;
+    }
+    const gctx = state.glowCanvas.getContext('2d');
+    gctx.clearRect(0,0,state.canvasW,state.canvasH);
+    const cw = state.canvasW/state.analysisW, ch = state.canvasH/state.analysisH;
+    gctx.fillStyle = 'rgba(255,255,255,0.30)';
+    for(let y=0;y<state.analysisH;y++){
+      for(let x=0;x<state.analysisW;x++){
+        if(fg[y*state.analysisW+x]){
+          gctx.fillRect(x*cw, y*ch, cw, ch);
+        }
+      }
+    }
+  }
+
+  /* ---------------- Shape mask + guide visual ---------------- */
+  function buildMask(shapeKey, w, h){
+    const off = document.createElement('canvas'); off.width=w; off.height=h;
+    const octx = off.getContext('2d');
+    const verts = SHAPE_DEFS[shapeKey];
+    const size = Math.min(w,h)*0.8;
+    octx.beginPath();
+    verts.forEach((v,i)=>{
+      const x = w/2 + v[0]*size/2, y = h/2 + v[1]*size/2;
+      if(i===0) octx.moveTo(x,y); else octx.lineTo(x,y);
+    });
+    octx.closePath();
+    octx.fillStyle = '#fff';
+    octx.fill();
+    const data = octx.getImageData(0,0,w,h).data;
+    const mask = new Uint8Array(w*h);
+    let count = 0;
+    for(let i=0;i<w*h;i++){ if(data[i*4+3] > 0){ mask[i]=1; count++; } }
+    return { mask, count };
+  }
+
+  function buildGuideCanvas(shapeKey, w, h){
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const gctx = c.getContext('2d');
+    const verts = SHAPE_DEFS[shapeKey];
+    const size = Math.min(w,h)*0.8;
+    gctx.beginPath();
+    verts.forEach((v,i)=>{
+      const x = w/2 + v[0]*size/2, y = h/2 + v[1]*size/2;
+      if(i===0) gctx.moveTo(x,y); else gctx.lineTo(x,y);
+    });
+    gctx.closePath();
+    gctx.fillStyle = 'rgba(255,217,61,0.28)';
+    gctx.fill();
+    gctx.lineWidth = 5;
+    gctx.strokeStyle = GUIDE_COLOR;
+    gctx.stroke();
+    return c;
+  }
+
+  /* ---------------- Particles (celebration) ---------------- */
+  function spawnParticles(cx, cy, count){
+    const colors = ['#E84A4A','#FF9F40','#FFD93D','#52B788','#4D96FF','#9B5DE5'];
+    const now = performance.now();
+    for(let i=0;i<count;i++){
+      const angle = Math.random()*Math.PI*2;
+      const speed = 60+Math.random()*160;
+      state.particles.push({ x:cx, y:cy, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+        born:now, life:900+Math.random()*500, color:colors[Math.floor(Math.random()*colors.length)], size:3+Math.random()*4 });
+    }
+  }
+  function drawParticles(){
+    const now = performance.now();
+    state.particles = state.particles.filter(p => (now-p.born) < p.life);
+    sctx.save();
+    state.particles.forEach(p=>{
+      const age = (now-p.born)/1000;
+      const x = p.x + p.vx*age, y = p.y + p.vy*age + 60*age*age;
+      const alpha = Math.max(0, 1-(now-p.born)/p.life);
+      sctx.globalAlpha = alpha;
+      sctx.fillStyle = p.color;
+      sctx.beginPath(); sctx.arc(x,y,p.size,0,Math.PI*2); sctx.fill();
+    });
+    sctx.restore();
+  }
+
+  /* ---------------- Round flow ---------------- */
+  function updateRoundPill(){
+    document.getElementById('roundPill').textContent = 'Round ' + state.round + ' of 3';
+  }
+  function setPrompt(text){ document.getElementById('promptText').textContent = text; }
+
+  function pickShape(shapeKey){
+    state.currentShape = shapeKey;
+    state.round = 1;
+    const built = buildMask(shapeKey, state.analysisW, state.analysisH);
+    state.insideShapeMask = built.mask;
+    state.insideShapeCount = built.count;
+    state.guideCanvas = buildGuideCanvas(shapeKey, state.canvasW, state.canvasH);
+    document.querySelectorAll('.shape-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.shape === shapeKey);
+    });
+    document.getElementById('resultBanner').textContent = '';
+    document.getElementById('nextBtn').classList.remove('show');
+    startRound();
+  }
+
+  function surpriseShape(){
+    let next = state.currentShape;
+    while(next === state.currentShape){ next = SHAPE_KEYS[Math.floor(Math.random()*SHAPE_KEYS.length)]; }
+    pickShape(next);
+  }
+
+  function startRound(){
+    if(!state.videoReady || !state.backgroundGray){
+      setPrompt('Turn on the camera and capture the background first (Setup screen).');
+      return;
+    }
+    updateRoundPill();
+    clearInterval(state.timerInterval);
+    state.challengeActive = false;
+    state.guideVisible = false;
+    document.getElementById('meterRow').style.visibility = 'hidden';
+    document.getElementById('resultBanner').textContent = '';
+    document.getElementById('nextBtn').classList.remove('show');
+
+    const shape = state.currentShape;
+    const round = state.round;
+    setPrompt('Listen...');
+    speakShapeName(shape, ()=>{
+      if(round === 2){
+        state.guideVisible = true;
+        setPrompt('Memorize it! (3 seconds)');
+        setTimeout(()=>{
+          state.guideVisible = false;
+          prepCue(round);
+        }, 3000);
+      } else {
+        state.guideVisible = (round === 1);
+        prepCue(round);
+      }
+    });
+  }
+
+  function prepCue(round){
+    setPrompt('Ready... Go! 🏃');
+    setTimeout(()=> beginChallenge(round), 1200);
+  }
+
+  function beginChallenge(round){
+    state.challengeActive = true;
+    state.peakFill = 0;
+    state.timeRemaining = state.roundTimerSeconds;
+    document.getElementById('meterRow').style.visibility = 'visible';
+    setPrompt(round === 1 ? 'Fill the shape together!' : (round === 2 ? 'Remember it — fill the shape!' : 'No guide — fill the shape from memory!'));
+
+    const ring = document.getElementById('timerRing');
+    updateTimerRing(ring);
+    let lastTickSec = -1;
+    state.timerInterval = setInterval(()=>{
+      state.timeRemaining -= 0.1;
+      updateTimerRing(ring);
+      const secDisplay = Math.max(0, Math.ceil(state.timeRemaining));
+      if(secDisplay <= 3 && secDisplay !== lastTickSec && state.timeRemaining > 0){ lastTickSec = secDisplay; tickSound(); }
+      if(state.timeRemaining <= 0){
+        clearInterval(state.timerInterval);
+        endChallenge();
+      }
+    }, 100);
+  }
+
+  function updateTimerRing(ring){
+    const pct = Math.max(0, (state.timeRemaining/state.roundTimerSeconds)*100);
+    ring.style.setProperty('--pct', pct.toFixed(1));
+    ring.dataset.sec = Math.max(0, Math.ceil(state.timeRemaining));
+  }
+
+  function updateLiveMeter(pct){
+    document.getElementById('fillBar').style.width = (pct*100).toFixed(0)+'%';
+    document.getElementById('fillPctText').textContent = Math.round(pct*100)+'%';
+  }
+
+  function endChallenge(){
+    state.challengeActive = false;
+    state.guideVisible = true; // reveal guide as feedback
+    const score = state.peakFill;
+    updateLiveMeter(score);
+
+    let grade, isGreat = false;
+    if(score >= 0.75){ grade = 'Amazing fit! 🎉'; isGreat = true; fanfare(); spawnParticles(state.canvasW/2, state.canvasH/2, 36); }
+    else if(score >= 0.45){ grade = 'Great teamwork! 👏'; sparkleSound(); }
+    else { grade = 'Nice try — let\'s go again! 💪'; lowTone(); }
+
+    document.getElementById('resultBanner').textContent = `${Math.round(score*100)}% filled — ${grade}`;
+    setPrompt(`That's a ${state.currentShape}! Here's how close you got.`);
+
+    const nextBtn = document.getElementById('nextBtn');
+    nextBtn.textContent = state.round >= 3 ? 'Pick a New Shape ▶' : 'Start Round ' + (state.round+1) + ' ▶';
+    nextBtn.classList.add('show');
+  }
+
+  function nextRoundOrShape(){
+    if(state.round >= 3){
+      setPrompt('Great work! Pick a new shape to try.');
+      document.getElementById('nextBtn').classList.remove('show');
+      document.getElementById('resultBanner').textContent = '';
+      state.guideVisible = false;
+    } else {
+      state.round += 1;
+      startRound();
+    }
+  }
+
+  function redoRound(){
+    startRound();
+  }
+
+  /* ---------------- UI wiring ---------------- */
+  function buildShapeButtons(){
+    const el = document.getElementById('shapeButtons');
+    el.innerHTML = SHAPE_KEYS.map(s=>`<button class="shape-btn" data-shape="${s}" aria-label="${s}">${SHAPE_EMOJI[s]}</button>`).join('');
+    el.querySelectorAll('.shape-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> pickShape(btn.dataset.shape));
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    buildShapeButtons();
+
+    document.getElementById('sensChips').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.chip'); if(!btn) return;
+      document.querySelectorAll('#sensChips .chip').forEach(c=>c.classList.remove('selected'));
+      btn.classList.add('selected');
+      state.sensitivity = btn.dataset.val;
+    });
+    document.getElementById('timerChips').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.chip'); if(!btn) return;
+      document.querySelectorAll('#timerChips .chip').forEach(c=>c.classList.remove('selected'));
+      btn.classList.add('selected');
+      state.roundTimerSeconds = parseInt(btn.dataset.val,10);
+    });
+
+    document.getElementById('camBtn').addEventListener('click', ()=>{ ensureAudio(); turnOnCamera(); });
+    document.getElementById('captureBtn').addEventListener('click', startCaptureSequence);
+    document.getElementById('continueBtn').addEventListener('click', ()=>{
+      showScreen('screen-game');
+      setPrompt('Pick a shape to begin!');
+    });
+
+    document.getElementById('surpriseBtn').addEventListener('click', surpriseShape);
+    document.getElementById('resetRoundBtn').addEventListener('click', redoRound);
+    document.getElementById('nextBtn').addEventListener('click', nextRoundOrShape);
+
+    document.getElementById('muteBtn').addEventListener('click', (e)=>{
+      state.soundOn = !state.soundOn;
+      e.target.textContent = state.soundOn ? '🔊' : '🔇';
+      if(!state.soundOn && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+
+    document.getElementById('recalBtn').addEventListener('click', ()=>{
+      clearInterval(state.timerInterval);
+      state.challengeActive = false;
+      state.backgroundGray = null;
+      document.getElementById('calibStatus').textContent = 'Step everyone out of frame, then capture the empty room.';
+      document.getElementById('continueBtn').style.display = 'none';
+      showScreen('screen-setup');
+    });
+
+    document.getElementById('backBtn').addEventListener('click', ()=>{
+      clearInterval(state.timerInterval);
+      state.challengeActive = false;
+      if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; }
+      state.videoReady = false;
+      state.backgroundGray = null;
+      document.getElementById('previewArea').style.display = 'none';
+      document.getElementById('continueBtn').style.display = 'none';
+      document.getElementById('calibStatus').textContent = 'Step everyone out of frame, then capture the empty room.';
+      showScreen('screen-setup');
+    });
+  });
+})();
+</script>
+</body>
+</html>
